@@ -8,6 +8,7 @@ let score = 0;   // 分数
 let selectedCell = null;  // 当前选中的方块
 let soundEnabled = true;  // 音效开关
 let lastMilestone = 0;  // 上次达到的里程碑
+let bgMusicInterval = null;  // 背景音乐定时器
 
 // 音频上下文
 let audioContext = null;
@@ -83,12 +84,83 @@ function playMilestoneSound() {
     });
 }
 
+// 播放背景音乐音符
+function playBgNote(frequency, duration) {
+    if (!soundEnabled || !audioContext) return;
+    
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = frequency;
+    oscillator.type = 'triangle';
+    
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + duration);
+}
+
+// 开始背景音乐
+function startBgMusic() {
+    if (bgMusicInterval) return;
+    
+    // 舒缓的旋律（C大调）
+    const melody = [
+        { note: 262, duration: 0.5 },  // C
+        { note: 294, duration: 0.5 },  // D
+        { note: 330, duration: 0.5 },  // E
+        { note: 349, duration: 0.5 },  // F
+        { note: 392, duration: 0.5 },  // G
+        { note: 349, duration: 0.5 },  // F
+        { note: 330, duration: 0.5 },  // E
+        { note: 294, duration: 0.5 }   // D
+    ];
+    
+    let noteIndex = 0;
+    
+    const playNextNote = () => {
+        if (!soundEnabled) return;
+        
+        const currentNote = melody[noteIndex];
+        // 根据分数调整音高和速度（分数越高越紧张）
+        const speedMultiplier = 1 + (score / 2000); // 分数越高速度越快
+        const pitchMultiplier = 1 + (score / 5000); // 分数越高音调越高
+        
+        playBgNote(currentNote.note * pitchMultiplier, currentNote.duration / speedMultiplier);
+        
+        noteIndex = (noteIndex + 1) % melody.length;
+    };
+    
+    playNextNote();
+    bgMusicInterval = setInterval(() => {
+        playNextNote();
+    }, 600); // 基础间隔
+}
+
+// 停止背景音乐
+function stopBgMusic() {
+    if (bgMusicInterval) {
+        clearInterval(bgMusicInterval);
+        bgMusicInterval = null;
+    }
+}
+
 // 初始化游戏
 function initGame() {
     score = 0;
     updateScore();
     board = createBoard();
     renderBoard();
+    
+    // 启动背景音乐
+    if (soundEnabled) {
+        initAudio();
+        startBgMusic();
+    }
 }
 
 // 创建游戏棋盘
@@ -379,6 +451,9 @@ document.addEventListener('DOMContentLoaded', () => {
         e.target.textContent = soundEnabled ? '🔊 音效' : '🔇 静音';
         if (soundEnabled) {
             initAudio();
+            startBgMusic();
+        } else {
+            stopBgMusic();
         }
     });
 });
