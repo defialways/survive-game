@@ -6,6 +6,82 @@ const COLORS = ['🔴', '🟡', '🟢', '🔵', '🟣', '🟠'];  // 6种颜色�
 let board = [];  // 游戏棋盘
 let score = 0;   // 分数
 let selectedCell = null;  // 当前选中的方块
+let soundEnabled = true;  // 音效开关
+let lastMilestone = 0;  // 上次达到的里程碑
+
+// 音频上下文
+let audioContext = null;
+
+// 初始化音频
+function initAudio() {
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+}
+
+// 播放点击音效
+function playClickSound() {
+    if (!soundEnabled || !audioContext) return;
+    
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 800;
+    oscillator.type = 'sine';
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.1);
+}
+
+// 播放消除音效
+function playMatchSound() {
+    if (!soundEnabled || !audioContext) return;
+    
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 1200;
+    oscillator.type = 'square';
+    
+    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.2);
+}
+
+// 播放里程碑音效
+function playMilestoneSound() {
+    if (!soundEnabled || !audioContext) return;
+    
+    const notes = [523, 659, 784, 1047];
+    notes.forEach((freq, i) => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = freq;
+        oscillator.type = 'sine';
+        
+        const startTime = audioContext.currentTime + i * 0.1;
+        gainNode.gain.setValueAtTime(0.3, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.3);
+        
+        oscillator.start(startTime);
+        oscillator.stop(startTime + 0.3);
+    });
+}
 
 // 初始化游戏
 function initGame() {
@@ -66,6 +142,9 @@ function getCellColor(emoji) {
 
 // 处理方块点击
 function handleCellClick(row, col) {
+    initAudio(); // 确保音频已初始化
+    playClickSound(); // 播放点击音效
+    
     if (!selectedCell) {
         // 第一次点击：选中方块
         selectedCell = { row, col };
@@ -184,6 +263,9 @@ function processMatches() {
         }
     }
     
+    // 播放消除音效
+    playMatchSound();
+    
     // 消除匹配的方块
     matchedCells.forEach(cell => {
         board[cell.row][cell.col] = null;
@@ -238,10 +320,65 @@ function fillEmpty() {
 // 更新分数显示
 function updateScore() {
     document.getElementById('score').textContent = score;
+    
+    // 检查是否达到新的里程碑（每1000分）
+    const currentMilestone = Math.floor(score / 1000);
+    if (currentMilestone > lastMilestone) {
+        lastMilestone = currentMilestone;
+        celebrateMilestone();
+    }
+}
+
+// 庆祝里程碑
+function celebrateMilestone() {
+    // 页面闪烁
+    document.body.classList.add('flash');
+    setTimeout(() => {
+        document.body.classList.remove('flash');
+    }, 1000);
+    
+    // 播放音效
+    playMilestoneSound();
+    
+    // 爆米花效果
+    createConfetti();
+}
+
+// 创建爆米花效果
+function createConfetti() {
+    const colors = ['#ff6b6b', '#ffd93d', '#6bcf7f', '#4d96ff', '#b565d8', '#ff9f43'];
+    const container = document.querySelector('.container');
+    
+    for (let i = 0; i < 50; i++) {
+        const confetti = document.createElement('div');
+        confetti.className = 'confetti';
+        confetti.style.left = Math.random() * 100 + '%';
+        confetti.style.top = '-10px';
+        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
+        confetti.style.animationDelay = Math.random() * 0.3 + 's';
+        
+        container.appendChild(confetti);
+        
+        setTimeout(() => confetti.remove(), 2000);
+    }
 }
 
 // 页面加载完成后初始化游戏
 document.addEventListener('DOMContentLoaded', () => {
     initGame();
-    document.getElementById('restart').addEventListener('click', initGame);
+    document.getElementById('restart').addEventListener('click', () => {
+        score = 0;
+        lastMilestone = 0;
+        initGame();
+    });
+    
+    // 音效开关
+    document.getElementById('sound-toggle').addEventListener('click', (e) => {
+        soundEnabled = !soundEnabled;
+        e.target.textContent = soundEnabled ? '🔊 音效' : '🔇 静音';
+        if (soundEnabled) {
+            initAudio();
+        }
+    });
 });

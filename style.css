@@ -34,13 +34,19 @@ h1 {
     padding: 0 10px;
 }
 
+.game-info > div {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
 .score {
     font-size: 24px;
     font-weight: bold;
     color: #333;
 }
 
-#restart {
+#restart, #sound-toggle {
     padding: 10px 20px;
     font-size: 16px;
     background: #667eea;
@@ -51,7 +57,7 @@ h1 {
     transition: background 0.3s;
 }
 
-#restart:hover {
+#restart:hover, #sound-toggle:hover {
     background: #5568d3;
 }
 
@@ -85,4 +91,31 @@ h1 {
 .cell.selected {
     border: 3px solid #fff;
     box-shadow: 0 0 15px rgba(102, 126, 234, 0.8);
+}
+
+/* 页面闪烁效果 */
+@keyframes flash {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+.flash {
+    animation: flash 0.5s ease-in-out 2;
+}
+
+/* 爆米花效果 */
+.confetti {
+    position: fixed;
+    width: 10px;
+    height: 10px;
+    background: #f0f;
+    position: absolute;
+    animation: confetti-fall 2s ease-out forwards;
+}
+
+@keyframes confetti-fall {
+    to {
+        transform: translateY(100vh) rotate(360deg);
+        opacity: 0;
+    }
 }
