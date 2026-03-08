@@ -24,16 +24,6 @@ function createBoard() {
             newBoard[row][col] = getRandomColor();
         }
     }
-    // 确保初始状态没有匹配
-    while (hasMatches()) {
-        for (let row = 0; row < GRID_SIZE; row++) {
-            for (let col = 0; col < GRID_SIZE; col++) {
-                if (isPartOfMatch(row, col)) {
-                    newBoard[row][col] = getRandomColor();
-                }
-            }
-        }
-    }
     return newBoard;
 }
 
