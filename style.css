@@ -110,6 +110,56 @@ h1 {
     box-shadow: 0 0 15px rgba(102, 126, 234, 0.8);
 }
 
+/* 特殊方块视觉增强 */
+.cell[data-special="bomb"] {
+    border: 2px solid #8b0000;
+    animation: pulse-bomb 1.5s ease-in-out infinite;
+}
+
+.cell[data-special="rainbow"] {
+    border: 2px solid #9400d3;
+    animation: pulse-rainbow 1.5s ease-in-out infinite;
+    background: linear-gradient(45deg, #ff6b6b, #ffd93d, #6bcf7f, #4d96ff, #b565d8);
+    background-size: 300% 300%;
+    animation: rainbow-gradient 2s ease infinite;
+}
+
+.cell[data-special="horizontal"] {
+    border: 2px solid #00bfff;
+    animation: pulse-horizontal 1.5s ease-in-out infinite;
+}
+
+.cell[data-special="vertical"] {
+    border: 2px solid #00ced1;
+    animation: pulse-vertical 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-bomb {
+    0%, 100% { box-shadow: 0 0 5px #8b0000; }
+    50% { box-shadow: 0 0 15px #8b0000; }
+}
+
+@keyframes pulse-rainbow {
+    0%, 100% { box-shadow: 0 0 5px #9400d3; }
+    50% { box-shadow: 0 0 15px #9400d3; }
+}
+
+@keyframes pulse-horizontal {
+    0%, 100% { box-shadow: 0 0 5px #00bfff; }
+    50% { box-shadow: 0 0 15px #00bfff; }
+}
+
+@keyframes pulse-vertical {
+    0%, 100% { box-shadow: 0 0 5px #00ced1; }
+    50% { box-shadow: 0 0 15px #00ced1; }
+}
+
+@keyframes rainbow-gradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
 .special-blocks-info {
     margin-top: 15px;
     font-size: 12px;

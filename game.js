@@ -178,14 +178,24 @@ function initGame() {
 // 创建游戏棋盘
 function createBoard() {
     const newBoard = [];
+    // 特殊方块概率随关卡降低，防止后期太简单
+    const specialChance = Math.max(0.05, 0.1 - (level * 0.01));
+    
     for (let row = 0; row < GRID_SIZE; row++) {
         newBoard[row] = [];
         for (let col = 0; col < GRID_SIZE; col++) {
-            // 10% chance to create a special block
-            if (Math.random() < 0.1) {
-                const specialKeys = Object.keys(SPECIAL_TYPES);
-                const randomSpecial = specialKeys[Math.floor(Math.random() * specialKeys.length)];
-                newBoard[row][col] = SPECIAL_TYPES[randomSpecial];
+            if (Math.random() < specialChance) {
+                // 炸弹和消除类方块概率较低（防止连锁太强）
+                const random = Math.random();
+                if (random < 0.4) {
+                    newBoard[row][col] = SPECIAL_TYPES.RAINBOW;
+                } else if (random < 0.6) {
+                    newBoard[row][col] = SPECIAL_TYPES.BOMB;
+                } else if (random < 0.8) {
+                    newBoard[row][col] = SPECIAL_TYPES.HORIZONTAL;
+                } else {
+                    newBoard[row][col] = SPECIAL_TYPES.VERTICAL;
+                }
             } else {
                 newBoard[row][col] = getRandomColor();
             }
@@ -208,10 +218,18 @@ function renderBoard() {
         for (let col = 0; col < GRID_SIZE; col++) {
             const cell = document.createElement('div');
             cell.className = 'cell';
-            cell.textContent = board[row][col];
+            const emoji = board[row][col];
+            cell.textContent = emoji;
             cell.dataset.row = row;
             cell.dataset.col = col;
-            cell.style.backgroundColor = getCellColor(board[row][col]);
+            cell.style.backgroundColor = getCellColor(emoji);
+            
+            // 为特殊方块添加标识属性
+            if (emoji === SPECIAL_TYPES.BOMB) cell.dataset.special = 'bomb';
+            else if (emoji === SPECIAL_TYPES.RAINBOW) cell.dataset.special = 'rainbow';
+            else if (emoji === SPECIAL_TYPES.HORIZONTAL) cell.dataset.special = 'horizontal';
+            else if (emoji === SPECIAL_TYPES.VERTICAL) cell.dataset.special = 'vertical';
+            
             cell.addEventListener('click', () => handleCellClick(row, col));
             cell.addEventListener('touchstart', (e) => {
                 e.preventDefault();
@@ -491,8 +509,20 @@ function updateLevelInfo() {
 // 升级处理
 function levelUp() {
     level++;
-    targetScore = level * 500; // 每关增加500分目标
+    // 目标分数：基础500 + 每关增加，上限5000
+    const baseScore = 500;
+    const increment = level * 300;
+    targetScore = Math.min(baseScore + increment, 5000);
     updateLevelInfo();
+    
+    // 每5关给予奖励（生成额外特殊方块）
+    if (level % 5 === 0) {
+        // 奖励关卡：增加一个彩虹方块到随机位置
+        const rewardRow = Math.floor(Math.random() * GRID_SIZE);
+        const rewardCol = Math.floor(Math.random() * GRID_SIZE);
+        board[rewardRow][rewardCol] = SPECIAL_TYPES.RAINBOW;
+        renderBoard();
+    }
     
     // 页面闪烁庆祝升级
     document.body.classList.add('flash');
@@ -505,9 +535,6 @@ function levelUp() {
     
     // 创建更多爆米花效果
     createConfetti();
-    
-    // 增加特殊方块生成概率（最高不超过30%）
-    // 这里可以添加难度增加的逻辑，比如减少移动次数限制等
 }
 
 // 庆祝里程碑
