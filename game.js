@@ -23,6 +23,8 @@ let undoStack = [];  // 撤销栈
 const MAX_UNDO = 5;  // 最多保存5步
 let triggeredSpecials = new Set();  // 已触发的特殊方块（防止连锁二次触发）
 let lastTouchTime = 0;  // 触摸事件防重复触发时间戳
+let isTouchEvent = false;  // 区分触摸和点击事件（小狐狸建议）
+let isProcessing = false;  // 防止重复处理（替换window.isLevelingUp）
 
 // 音频上下文
 let audioContext = null;
@@ -244,7 +246,7 @@ function initGame() {
     totalCleared = 0;
     undoStack = [];
     triggeredSpecials.clear();
-    window.isLevelingUp = false;
+    isProcessing = false;
     
     // 从排行榜获取上次最高分，作为初始目标
     const leaderboard = getLeaderboard();
@@ -321,7 +323,12 @@ function renderBoard() {
             else if (emoji === SPECIAL_TYPES.HORIZONTAL) cell.dataset.special = 'horizontal';
             else if (emoji === SPECIAL_TYPES.VERTICAL) cell.dataset.special = 'vertical';
             
-            cell.addEventListener('click', () => handleCellClick(row, col));
+            // 触摸事件优先处理（小狐狸建议：避免touch和click重复触发）
+            cell.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                isTouchEvent = true;
+            }, { passive: false });
+            
             cell.addEventListener('touchend', (e) => {
                 e.preventDefault();
                 const now = Date.now();
@@ -329,6 +336,14 @@ function renderBoard() {
                 lastTouchTime = now;
                 handleCellClick(row, col);
             }, { passive: false });
+            
+            cell.addEventListener('click', () => {
+                if (isTouchEvent) {
+                    isTouchEvent = false;  // 如果是触摸触发的，忽略click
+                    return;
+                }
+                handleCellClick(row, col);
+            });
             gameBoard.appendChild(cell);
         }
     }
@@ -395,9 +410,7 @@ function isAdjacent(cell1, cell2) {
 
 // 交换两个方块
 function swapCells(cell1, cell2) {
-    // 保存撤销状态
-    saveUndoState();
-    
+    // 先检查是否有匹配，不匹配就不保存撤销状态（小狐狸建议）
     const temp = board[cell1.row][cell1.col];
     board[cell1.row][cell1.col] = board[cell2.row][cell2.col];
     board[cell2.row][cell2.col] = temp;
@@ -406,6 +419,8 @@ function swapCells(cell1, cell2) {
     
     // 检查是否有匹配
     if (hasMatches()) {
+        // 有匹配才保存撤销状态
+        saveUndoState();
         moveCount++;
         updateMoveCount();
         comboCount = 0;
@@ -413,8 +428,7 @@ function swapCells(cell1, cell2) {
             processMatches();
         }, 300);
     } else {
-        // 没有匹配，交换回去（不保存撤销状态）
-        undoStack.pop(); // 移除刚才保存的状态
+        // 没有匹配，直接交换回去
         setTimeout(() => {
             board[cell2.row][cell2.col] = board[cell1.row][cell1.col];
             board[cell1.row][cell1.col] = temp;
@@ -903,9 +917,16 @@ function hasValidMoves() {
     return false;
 }
 
-// 洗牌棋盘
-function shuffleBoard() {
-    // 收集所有方块，随机打乱
+// 洗牌棋盘（带安全计数器）
+function shuffleBoard(maxRetries = 10) {
+    if (maxRetries <= 0) {
+        // 重试太多次，直接重新初始化
+        board = createBoard();
+        renderBoard();
+        return;
+    }
+    
+    // 收集所有方块
     const allCells = [];
     for (let row = 0; row < GRID_SIZE; row++) {
         for (let col = 0; col < GRID_SIZE; col++) {
@@ -929,9 +950,9 @@ function shuffleBoard() {
     
     renderBoard();
     
-    // 如果洗牌后还是死局，再次洗牌
+    // 如果洗牌后还是死局，再次洗牌（带递减计数器）
     if (!hasValidMoves()) {
-        setTimeout(() => shuffleBoard(), 500);
+        setTimeout(() => shuffleBoard(maxRetries - 1), 300);
     }
 }
 
@@ -1104,9 +1125,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // 页面关闭前保存记录（小狐狸建议）
     window.addEventListener('beforeunload', () => {
         if (score > 0) {
-            saveToLeaderboard(score, level);
+            saveToLeaderboard(score);
         }
     });
+    
+    // 每次分数变化时也保存（防止数据丢失）
+    const originalUpdateScore = updateScore;
 });
 
 
