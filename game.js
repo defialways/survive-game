@@ -22,6 +22,7 @@ let totalCleared = 0;  // 累计消除方块数
 let undoStack = [];  // 撤销栈
 const MAX_UNDO = 5;  // 最多保存5步
 let triggeredSpecials = new Set();  // 已触发的特殊方块（防止连锁二次触发）
+let lastTouchTime = 0;  // 触摸事件防重复触发时间戳
 
 // 音频上下文
 let audioContext = null;
@@ -118,29 +119,50 @@ function playBgNote(frequency, duration) {
     oscillator.stop(audioContext.currentTime + duration);
 }
 
-// 开始背景音乐 - 轻柔的循环旋律
+// 开始背景音乐 - River Flows in You (简化版)
 function startBgMusic() {
     if (bgMusicInterval) return;
     
-    // 轻柔的轻音乐旋律（类似摇篮曲的简单循环）
-    // 使用五声音阶，更和谐悦耳
+    // River Flows in You 主旋律 (Yiruma)
+    // 简化版本，保留原曲精髓
+    // A大调: F# G# A B C# D E F#
     const melody = [
-        { note: 262, duration: 0.8 },  // C4
-        { note: 294, duration: 0.4 },  // D4
-        { note: 330, duration: 0.8 },  // E4
-        { note: 392, duration: 0.8 },  // G4
-        { note: 330, duration: 0.4 },  // E4
-        { note: 294, duration: 0.8 },  // D4
-        { note: 262, duration: 1.2 },  // C4 (延长)
-        { note: 0, duration: 0.4 },    // 休止
-        { note: 330, duration: 0.8 },  // E4
-        { note: 392, duration: 0.4 },  // G4
-        { note: 440, duration: 0.8 },  // A4
-        { note: 392, duration: 0.4 },  // G4
-        { note: 330, duration: 0.8 },  // E4
-        { note: 294, duration: 0.8 },  // D4
-        { note: 262, duration: 1.6 },  // C4 (延长)
-        { note: 0, duration: 0.8 },    // 休止
+        // 第一句 - 经典开头
+        { note: 698, duration: 0.3 },  // F5
+        { note: 659, duration: 0.3 },  // E5
+        { note: 587, duration: 0.6 },  // D5
+        { note: 659, duration: 0.3 },  // E5
+        { note: 698, duration: 0.3 },  // F5
+        { note: 880, duration: 0.6 },  // A5
+        { note: 0, duration: 0.3 },    // 休止
+        
+        // 第二句 - 上升
+        { note: 698, duration: 0.3 },  // F5
+        { note: 659, duration: 0.3 },  // E5
+        { note: 587, duration: 0.6 },  // D5
+        { note: 659, duration: 0.3 },  // E5
+        { note: 698, duration: 0.3 },  // F5
+        { note: 784, duration: 0.6 },  // G5
+        { note: 0, duration: 0.3 },    // 休止
+        
+        // 第三句 - 高潮
+        { note: 698, duration: 0.3 },  // F5
+        { note: 659, duration: 0.3 },  // E5
+        { note: 587, duration: 0.3 },  // D5
+        { note: 523, duration: 0.3 },  // C5
+        { note: 587, duration: 0.3 },  // D5
+        { note: 659, duration: 0.6 },  // E5
+        { note: 587, duration: 0.6 },  // D5
+        { note: 0, duration: 0.3 },    // 休止
+        
+        // 第四句 - 回落
+        { note: 523, duration: 0.3 },  // C5
+        { note: 587, duration: 0.3 },  // D5
+        { note: 659, duration: 0.6 },  // E5
+        { note: 587, duration: 0.3 },  // D5
+        { note: 523, duration: 0.3 },  // C5
+        { note: 440, duration: 0.9 },  // A4
+        { note: 0, duration: 0.6 },    // 休止
     ];
     
     let noteIndex = 0;
@@ -150,8 +172,8 @@ function startBgMusic() {
         
         const currentNote = melody[noteIndex];
         if (currentNote.note > 0) {
-            // 固定音量，不随分数变化，保持轻柔
-            playBgNote(currentNote.note, currentNote.duration * 0.8);
+            // 柔和的钢琴音色
+            playPianoNote(currentNote.note, currentNote.duration);
         }
         
         noteIndex = (noteIndex + 1) % melody.length;
@@ -160,7 +182,50 @@ function startBgMusic() {
     playNextNote();
     bgMusicInterval = setInterval(() => {
         playNextNote();
-    }, 800); // 较慢的间隔，更舒缓
+    }, 400); // 400ms间隔
+}
+
+// 播放钢琴音符 - 更接近钢琴音色
+function playPianoNote(frequency, duration) {
+    if (!soundEnabled || !audioContext) return;
+    
+    // 主振荡器 - 基础音
+    const osc1 = audioContext.createOscillator();
+    const gain1 = audioContext.createGain();
+    
+    // 第二振荡器 - 泛音，增加丰富度
+    const osc2 = audioContext.createOscillator();
+    const gain2 = audioContext.createGain();
+    
+    osc1.connect(gain1);
+    gain1.connect(audioContext.destination);
+    
+    osc2.connect(gain2);
+    gain2.connect(audioContext.destination);
+    
+    // 主音 - 使用三角波，接近钢琴
+    osc1.frequency.value = frequency;
+    osc1.type = 'triangle';
+    
+    // 泛音 - 高八度，音量更小
+    osc2.frequency.value = frequency * 2;
+    osc2.type = 'sine';
+    
+    // 钢琴包络：快速起音，缓慢衰减
+    const now = audioContext.currentTime;
+    gain1.gain.setValueAtTime(0, now);
+    gain1.gain.linearRampToValueAtTime(0.08, now + 0.02); // 快速起音
+    gain1.gain.exponentialRampToValueAtTime(0.01, now + duration); // 缓慢衰减
+    
+    gain2.gain.setValueAtTime(0, now);
+    gain2.gain.linearRampToValueAtTime(0.02, now + 0.02);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    
+    osc1.start(now);
+    osc1.stop(now + duration);
+    
+    osc2.start(now);
+    osc2.stop(now + duration);
 }
 
 // 停止背景音乐
@@ -1044,5 +1109,4 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// 触摸事件防重复触发时间戳
-let lastTouchTime = 0;
+
