@@ -11,17 +11,43 @@
         <h1>🎮 消消乐</h1>
         <div class="game-info">
             <div class="score">分数: <span id="score">0</span></div>
-            <div class="level-info">关卡: <span id="level">1</span> / 目标: <span id="target-score">500</span></div>
-            <div class="button-group">
-                <button id="restart">重新开始</button>
-                <button id="sound-toggle">🔊 音效</button>
-            </div>
+            <div class="level-info">关卡: <span id="level">1</span> | 目标: <span id="target-score">500</span> | 步数: <span id="move-count">0</span></div>
         </div>
+        
         <div id="game-board"></div>
+        
         <div class="special-blocks-info">
             <p>特殊方块: 💣炸弹 | 🌈彩虹 | ↔️横消 | ↕️竖消</p>
         </div>
+        
+        <div class="action-buttons">
+            <button id="undo">↩️ 撤销 (0)</button>
+            <button id="hint">💡 提示</button>
+            <button id="restart">🔄 重新开始</button>
+            <button id="sound-toggle">🔊 音效</button>
+            <button id="leaderboard-btn">🏆 排行榜</button>
+            <button id="achievements-btn">🎖️ 成就</button>
+        </div>
     </div>
+    
+    <!-- 排行榜模态框 -->
+    <div id="leaderboard-modal" class="modal">
+        <div class="modal-content">
+            <h2>🏆 排行榜</h2>
+            <ul id="leaderboard-list"></ul>
+            <button class="modal-close">关闭</button>
+        </div>
+    </div>
+    
+    <!-- 成就模态框 -->
+    <div id="achievements-modal" class="modal">
+        <div class="modal-content">
+            <h2>🎖️ 成就</h2>
+            <ul id="achievements-list"></ul>
+            <button class="modal-close">关闭</button>
+        </div>
+    </div>
+    
     <script src="game.js"></script>
 </body>
 </html>

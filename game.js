@@ -17,6 +17,11 @@ let selectedCell = null;  // 当前选中的方块
 let soundEnabled = true;  // 音效开关
 let lastMilestone = 0;  // 上次达到的里程碑
 let bgMusicInterval = null;  // 背景音乐定时器
+let moveCount = 0;  // 移动次数
+let comboCount = 0;  // 连击数
+let totalCleared = 0;  // 累计消除方块数
+let undoStack = [];  // 撤销栈（最多保存3步）
+const MAX_UNDO = 3;
 
 // 音频上下文
 let audioContext = null;
@@ -162,9 +167,14 @@ function initGame() {
     score = 0;
     level = 1;
     targetScore = 500;
+    moveCount = 0;
+    comboCount = 0;
+    totalCleared = 0;
+    undoStack = [];
     window.isLevelingUp = false;
     updateScore();
     updateLevelInfo();
+    updateMoveCount();
     board = createBoard();
     renderBoard();
     
@@ -301,6 +311,9 @@ function isAdjacent(cell1, cell2) {
 
 // 交换两个方块
 function swapCells(cell1, cell2) {
+    // 保存撤销状态
+    saveUndoState();
+    
     const temp = board[cell1.row][cell1.col];
     board[cell1.row][cell1.col] = board[cell2.row][cell2.col];
     board[cell2.row][cell2.col] = temp;
@@ -309,17 +322,251 @@ function swapCells(cell1, cell2) {
     
     // 检查是否有匹配
     if (hasMatches()) {
+        moveCount++;
+        updateMoveCount();
+        comboCount = 0;
         setTimeout(() => {
             processMatches();
         }, 300);
     } else {
-        // 没有匹配，交换回去
+        // 没有匹配，交换回去（不保存撤销状态）
+        undoStack.pop(); // 移除刚才保存的状态
         setTimeout(() => {
             board[cell2.row][cell2.col] = board[cell1.row][cell1.col];
             board[cell1.row][cell1.col] = temp;
             renderBoard();
         }, 300);
     }
+}
+
+// 保存撤销状态
+function saveUndoState() {
+    undoStack.push({
+        board: board.map(row => [...row]),
+        score: score,
+        level: level,
+        comboCount: comboCount,
+        totalCleared: totalCleared
+    });
+    if (undoStack.length > MAX_UNDO) {
+        undoStack.shift();
+    }
+    updateUndoButton();
+}
+
+// 执行撤销
+function undo() {
+    if (undoStack.length === 0) return;
+    
+    const state = undoStack.pop();
+    board = state.board;
+    score = state.score;
+    level = state.level;
+    comboCount = state.comboCount;
+    totalCleared = state.totalCleared;
+    
+    updateScore();
+    updateLevelInfo();
+    updateMoveCount();
+    renderBoard();
+    updateUndoButton();
+}
+
+// 更新撤销按钮状态
+function updateUndoButton() {
+    const undoBtn = document.getElementById('undo');
+    if (undoBtn) {
+        undoBtn.disabled = undoStack.length === 0;
+        undoBtn.textContent = `↩️ 撤销 (${undoStack.length})`;
+    }
+}
+
+// 提示功能
+function showHint() {
+    // 找到一个可执行的匹配
+    for (let row = 0; row < GRID_SIZE; row++) {
+        for (let col = 0; col < GRID_SIZE; col++) {
+            // 检查与右边交换
+            if (col < GRID_SIZE - 1) {
+                swapInPlace(row, col, row, col + 1);
+                if (hasMatches()) {
+                    swapInPlace(row, col, row, col + 1);
+                    highlightHint(row, col, row, col + 1);
+                    return;
+                }
+                swapInPlace(row, col, row, col + 1);
+            }
+            // 检查与下面交换
+            if (row < GRID_SIZE - 1) {
+                swapInPlace(row, col, row + 1, col);
+                if (hasMatches()) {
+                    swapInPlace(row, col, row + 1, col);
+                    highlightHint(row, col, row + 1, col);
+                    return;
+                }
+                swapInPlace(row, col, row + 1, col);
+            }
+        }
+    }
+}
+
+// 临时交换（用于提示检测）
+function swapInPlace(r1, c1, r2, c2) {
+    const temp = board[r1][c1];
+    board[r1][c1] = board[r2][c2];
+    board[r2][c2] = temp;
+}
+
+// 高亮显示提示
+function highlightHint(r1, c1, r2, c2) {
+    const cells = document.querySelectorAll('.cell');
+    const index1 = r1 * GRID_SIZE + c1;
+    const index2 = r2 * GRID_SIZE + c2;
+    
+    cells[index1].classList.add('hint');
+    cells[index2].classList.add('hint');
+    
+    setTimeout(() => {
+        cells[index1].classList.remove('hint');
+        cells[index2].classList.remove('hint');
+    }, 1500);
+}
+
+// 更新移动次数显示
+function updateMoveCount() {
+    const moveCountEl = document.getElementById('move-count');
+    if (moveCountEl) {
+        moveCountEl.textContent = moveCount;
+    }
+}
+
+// ============ 排行榜系统 ============
+const LEADERBOARD_KEY = 'survive_leaderboard';
+const ACHIEVEMENTS_KEY = 'survive_achievements';
+
+// 获取排行榜数据
+function getLeaderboard() {
+    try {
+        const data = localStorage.getItem(LEADERBOARD_KEY);
+        return data ? JSON.parse(data) : [];
+    } catch {
+        return [];
+    }
+}
+
+// 保存到排行榜
+function saveToLeaderboard(score, level) {
+    const leaderboard = getLeaderboard();
+    leaderboard.push({
+        score,
+        level,
+        date: new Date().toLocaleDateString('zh-CN'),
+        totalCleared
+    });
+    // 按分数排序，保留前10名
+    leaderboard.sort((a, b) => b.score - a.score);
+    leaderboard.splice(10);
+    localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(leaderboard));
+}
+
+// 显示排行榜
+function showLeaderboard() {
+    const modal = document.getElementById('leaderboard-modal');
+    const list = document.getElementById('leaderboard-list');
+    const leaderboard = getLeaderboard();
+    
+    list.innerHTML = leaderboard.length === 0 
+        ? '<li>暂无记录，快来创造第一个记录吧！</li>'
+        : leaderboard.map((item, i) => `
+            <li class="${i < 3 ? 'top-' + (i + 1) : ''}">
+                <span class="rank">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1)}</span>
+                <span class="score">${item.score}分</span>
+                <span class="level">关卡${item.level}</span>
+                <span class="date">${item.date}</span>
+            </li>
+        `).join('');
+    
+    modal.classList.add('show');
+}
+
+// ============ 成就系统 ============
+const ACHIEVEMENTS = [
+    { id: 'level5', name: '初露锋芒', desc: '达到第5关', check: (s) => s.level >= 5 },
+    { id: 'level10', name: '消消乐达人', desc: '达到第10关', check: (s) => s.level >= 10 },
+    { id: 'score1000', name: '千分俱乐部', desc: '单局达到1000分', check: (s) => s.score >= 1000 },
+    { id: 'score5000', name: '五千元户', desc: '单局达到5000分', check: (s) => s.score >= 5000 },
+    { id: 'clear100', name: '清理大师', desc: '累计消除100个方块', check: (s) => s.totalCleared >= 100 },
+    { id: 'clear500', name: '消除狂人', desc: '累计消除500个方块', check: (s) => s.totalCleared >= 500 },
+    { id: 'combo3', name: '连击新星', desc: '达成3连击', check: (s) => s.comboCount >= 3 },
+    { id: 'combo5', name: '连击之王', desc: '达成5连击', check: (s) => s.comboCount >= 5 }
+];
+
+// 获取已解锁成就
+function getAchievements() {
+    try {
+        const data = localStorage.getItem(ACHIEVEMENTS_KEY);
+        return data ? JSON.parse(data) : [];
+    } catch {
+        return [];
+    }
+}
+
+// 检查成就
+function checkAchievements() {
+    const unlocked = getAchievements();
+    const state = { score, level, totalCleared, comboCount };
+    
+    ACHIEVEMENTS.forEach(achievement => {
+        if (!unlocked.includes(achievement.id) && achievement.check(state)) {
+            unlocked.push(achievement.id);
+            showAchievementUnlock(achievement);
+        }
+    });
+    
+    localStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(unlocked));
+}
+
+// 显示成就解锁
+function showAchievementUnlock(achievement) {
+    const toast = document.createElement('div');
+    toast.className = 'achievement-toast';
+    toast.innerHTML = `
+        <div class="achievement-icon">🏆</div>
+        <div class="achievement-info">
+            <div class="achievement-title">成就解锁!</div>
+            <div class="achievement-name">${achievement.name}</div>
+            <div class="achievement-desc">${achievement.desc}</div>
+        </div>
+    `;
+    document.body.appendChild(toast);
+    
+    playMilestoneSound();
+    
+    setTimeout(() => toast.classList.add('show'), 100);
+    setTimeout(() => toast.classList.remove('show'), 3000);
+    setTimeout(() => toast.remove(), 3500);
+}
+
+// 显示成就列表
+function showAchievements() {
+    const modal = document.getElementById('achievements-modal');
+    const list = document.getElementById('achievements-list');
+    const unlocked = getAchievements();
+    
+    list.innerHTML = ACHIEVEMENTS.map(a => `
+        <li class="${unlocked.includes(a.id) ? 'unlocked' : 'locked'}">
+            <span class="achievement-icon">${unlocked.includes(a.id) ? '🏆' : '🔒'}</span>
+            <span class="achievement-name">${a.name}</span>
+            <span class="achievement-desc">${a.desc}</span>
+        </li>
+    `).join('');
+    
+    modal.classList.add('show');
+}
+
+// 游戏结束时保存记录
+function gameOver() {
+    saveToLeaderboard(score, level);
 }
 
 // 检查是否有匹配
@@ -390,7 +637,6 @@ function processMatches() {
     matchedCells.forEach(cell => {
         const emoji = board[cell.row][cell.col];
         if (emoji === SPECIAL_TYPES.BOMB) {
-            // 炸弹：消除周围8个方块
             for (let dr = -1; dr <= 1; dr++) {
                 for (let dc = -1; dc <= 1; dc++) {
                     const r = cell.row + dr;
@@ -401,14 +647,12 @@ function processMatches() {
                 }
             }
         } else if (emoji === SPECIAL_TYPES.HORIZONTAL) {
-            // 水平消除：消除整行
             for (let c = 0; c < GRID_SIZE; c++) {
                 if (c !== cell.col) {
                     specialEffects.push({ row: cell.row, col: c });
                 }
             }
         } else if (emoji === SPECIAL_TYPES.VERTICAL) {
-            // 垂直消除：消除整列
             for (let r = 0; r < GRID_SIZE; r++) {
                 if (r !== cell.row) {
                     specialEffects.push({ row: r, col: cell.col });
@@ -417,7 +661,7 @@ function processMatches() {
         }
     });
     
-    // 合并特殊效果到匹配的方块中
+    // 合并特殊效果
     specialEffects.forEach(effect => {
         const alreadyMatched = matchedCells.some(cell => cell.row === effect.row && cell.col === effect.col);
         if (!alreadyMatched) {
@@ -425,17 +669,30 @@ function processMatches() {
         }
     });
     
+    // 增加连击数
+    comboCount++;
+    totalCleared += matchedCells.length;
+    
     // 播放消除音效
     playMatchSound();
+    
+    // 显示消除动画
+    showClearAnimation(matchedCells);
     
     // 消除匹配的方块
     matchedCells.forEach(cell => {
         board[cell.row][cell.col] = null;
     });
     
-    // 增加分数
-    score += matchedCells.length * 10;
+    // 计算分数（连击加成）
+    const comboBonus = comboCount > 1 ? comboCount * 5 : 0;
+    score += matchedCells.length * 10 + comboBonus;
     updateScore();
+    
+    // 显示连击提示
+    if (comboCount > 1) {
+        showComboText(comboCount);
+    }
     
     renderBoard();
     
@@ -445,11 +702,46 @@ function processMatches() {
         fillEmpty();
         renderBoard();
         
-        // 检查是否还有新的匹配
         if (hasMatches()) {
             setTimeout(() => processMatches(), 300);
+        } else {
+            comboCount = 0; // 重置连击
+            checkAchievements(); // 检查成就
         }
     }, 300);
+}
+
+// 显示消除动画
+function showClearAnimation(cells) {
+    const allCells = document.querySelectorAll('.cell');
+    cells.forEach(({ row, col }) => {
+        const index = row * GRID_SIZE + col;
+        if (allCells[index]) {
+            allCells[index].classList.add('clearing');
+        }
+    });
+}
+
+// 显示连击文字
+function showComboText(combo) {
+    const comboEl = document.createElement('div');
+    comboEl.className = 'combo-text';
+    comboEl.textContent = `${combo}x 连击! 🔥`;
+    comboEl.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: ${20 + combo * 5}px;
+        font-weight: bold;
+        color: #ff6b6b;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        animation: combo-pop 0.8s ease-out forwards;
+        pointer-events: none;
+        z-index: 1000;
+    `;
+    document.body.appendChild(comboEl);
+    setTimeout(() => comboEl.remove(), 800);
 }
 
 // 方块下落
@@ -575,7 +867,10 @@ function createConfetti() {
 // 页面加载完成后初始化游戏
 document.addEventListener('DOMContentLoaded', () => {
     initGame();
+    
+    // 重新开始
     document.getElementById('restart').addEventListener('click', () => {
+        gameOver(); // 保存记录
         score = 0;
         lastMilestone = 0;
         initGame();
@@ -591,5 +886,24 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             stopBgMusic();
         }
+    });
+    
+    // 撤销按钮
+    document.getElementById('undo').addEventListener('click', undo);
+    
+    // 提示按钮
+    document.getElementById('hint').addEventListener('click', showHint);
+    
+    // 排行榜按钮
+    document.getElementById('leaderboard-btn').addEventListener('click', showLeaderboard);
+    
+    // 成就按钮
+    document.getElementById('achievements-btn').addEventListener('click', showAchievements);
+    
+    // 关闭模态框
+    document.querySelectorAll('.modal-close').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.modal').forEach(m => m.classList.remove('show'));
+        });
     });
 });
