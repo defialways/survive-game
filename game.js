@@ -20,8 +20,9 @@ let bgMusicInterval = null;  // 背景音乐定时器
 let moveCount = 0;  // 移动次数
 let comboCount = 0;  // 连击数
 let totalCleared = 0;  // 累计消除方块数
-let undoStack = [];  // 撤销栈（最多保存3步）
-const MAX_UNDO = 3;
+let undoStack = [];  // 撤销栈
+const MAX_UNDO = 5;  // 最多保存5步（小狐狸建议增加）
+let triggeredSpecials = new Set();  // 已触发的特殊方块（防止连锁二次触发）
 
 // 音频上下文
 let audioContext = null;
@@ -139,9 +140,9 @@ function startBgMusic() {
         if (!soundEnabled) return;
         
         const currentNote = melody[noteIndex];
-        // 根据分数调整音高和速度（分数越高越紧张）
-        const speedMultiplier = 1 + (score / 2000); // 分数越高速度越快
-        const pitchMultiplier = 1 + (score / 5000); // 分数越高音调越高
+        // 根据分数调整音高和速度，但设置上限（小狐狸建议）
+        const speedMultiplier = Math.min(1 + (score / 3000), 1.5); // 最快1.5倍
+        const pitchMultiplier = Math.min(1 + (score / 8000), 1.2); // 最高1.2倍音调
         
         playBgNote(currentNote.note * pitchMultiplier, currentNote.duration / speedMultiplier);
         
@@ -188,8 +189,8 @@ function initGame() {
 // 创建游戏棋盘
 function createBoard() {
     const newBoard = [];
-    // 特殊方块概率随关卡降低，防止后期太简单
-    const specialChance = Math.max(0.05, 0.1 - (level * 0.01));
+    // 特殊方块概率随关卡持续降低（小狐狸建议）
+    const specialChance = Math.max(0.02, 0.1 - (level * 0.015));
     
     for (let row = 0; row < GRID_SIZE; row++) {
         newBoard[row] = [];
@@ -241,10 +242,7 @@ function renderBoard() {
             else if (emoji === SPECIAL_TYPES.VERTICAL) cell.dataset.special = 'vertical';
             
             cell.addEventListener('click', () => handleCellClick(row, col));
-            cell.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                handleCellClick(row, col);
-            }, { passive: false });
+            cell.addEventListener('touchend', handleCellTouch, { passive: false });
             gameBoard.appendChild(cell);
         }
     }
@@ -632,11 +630,17 @@ function processMatches() {
         }
     }
     
-    // 处理特殊方块效果
+    // 处理特殊方块效果（连锁保护：已触发的特殊方块当作普通方块处理）
     const specialEffects = [];
     matchedCells.forEach(cell => {
         const emoji = board[cell.row][cell.col];
+        const cellKey = `${cell.row},${cell.col}`;
+        
+        // 如果这个特殊方块是被连锁消除的，不再触发特殊效果
+        if (triggeredSpecials.has(cellKey)) return;
+        
         if (emoji === SPECIAL_TYPES.BOMB) {
+            triggeredSpecials.add(cellKey);
             for (let dr = -1; dr <= 1; dr++) {
                 for (let dc = -1; dc <= 1; dc++) {
                     const r = cell.row + dr;
@@ -647,12 +651,14 @@ function processMatches() {
                 }
             }
         } else if (emoji === SPECIAL_TYPES.HORIZONTAL) {
+            triggeredSpecials.add(cellKey);
             for (let c = 0; c < GRID_SIZE; c++) {
                 if (c !== cell.col) {
                     specialEffects.push({ row: cell.row, col: c });
                 }
             }
         } else if (emoji === SPECIAL_TYPES.VERTICAL) {
+            triggeredSpecials.add(cellKey);
             for (let r = 0; r < GRID_SIZE; r++) {
                 if (r !== cell.row) {
                     specialEffects.push({ row: r, col: cell.col });
@@ -705,8 +711,17 @@ function processMatches() {
         if (hasMatches()) {
             setTimeout(() => processMatches(), 300);
         } else {
-            comboCount = 0; // 重置连击
-            checkAchievements(); // 检查成就
+            comboCount = 0;
+            triggeredSpecials.clear();
+            checkAchievements();
+            
+            // 检查死局并自动洗牌
+            if (!hasValidMoves()) {
+                showShuffleMessage();
+                setTimeout(() => {
+                    shuffleBoard();
+                }, 1000);
+            }
         }
     }, 300);
 }
@@ -742,6 +757,88 @@ function showComboText(combo) {
     `;
     document.body.appendChild(comboEl);
     setTimeout(() => comboEl.remove(), 800);
+}
+
+// ============ 死局检测和洗牌（小狐狸建议）============
+// 检查是否有有效移动
+function hasValidMoves() {
+    for (let row = 0; row < GRID_SIZE; row++) {
+        for (let col = 0; col < GRID_SIZE; col++) {
+            // 检查与右边交换
+            if (col < GRID_SIZE - 1) {
+                swapInPlace(row, col, row, col + 1);
+                if (hasMatches()) {
+                    swapInPlace(row, col, row, col + 1);
+                    return true;
+                }
+                swapInPlace(row, col, row, col + 1);
+            }
+            // 检查与下面交换
+            if (row < GRID_SIZE - 1) {
+                swapInPlace(row, col, row + 1, col);
+                if (hasMatches()) {
+                    swapInPlace(row, col, row + 1, col);
+                    return true;
+                }
+                swapInPlace(row, col, row + 1, col);
+            }
+        }
+    }
+    return false;
+}
+
+// 洗牌棋盘
+function shuffleBoard() {
+    // 收集所有方块，随机打乱
+    const allCells = [];
+    for (let row = 0; row < GRID_SIZE; row++) {
+        for (let col = 0; col < GRID_SIZE; col++) {
+            allCells.push(board[row][col]);
+        }
+    }
+    
+    // Fisher-Yates 洗牌
+    for (let i = allCells.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [allCells[i], allCells[j]] = [allCells[j], allCells[i]];
+    }
+    
+    // 重新填充棋盘
+    let index = 0;
+    for (let row = 0; row < GRID_SIZE; row++) {
+        for (let col = 0; col < GRID_SIZE; col++) {
+            board[row][col] = allCells[index++];
+        }
+    }
+    
+    renderBoard();
+    
+    // 如果洗牌后还是死局，再次洗牌
+    if (!hasValidMoves()) {
+        setTimeout(() => shuffleBoard(), 500);
+    }
+}
+
+// 显示洗牌提示
+function showShuffleMessage() {
+    const msg = document.createElement('div');
+    msg.className = 'shuffle-message';
+    msg.textContent = '🔄 没有可移动的方块，自动重新排列中...';
+    msg.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 20px 30px;
+        border-radius: 12px;
+        font-size: 16px;
+        z-index: 1000;
+        animation: fade-in 0.3s ease-out;
+    `;
+    document.body.appendChild(msg);
+    setTimeout(() => msg.remove(), 1500);
 }
 
 // 方块下落
@@ -906,4 +1003,23 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.modal').forEach(m => m.classList.remove('show'));
         });
     });
+    
+    // 页面关闭前保存记录（小狐狸建议）
+    window.addEventListener('beforeunload', () => {
+        if (score > 0) {
+            saveToLeaderboard(score, level);
+        }
+    });
 });
+
+// 触摸事件防重复触发（小狐狸建议）
+let lastTouchTime = 0;
+function handleCellTouch(e) {
+    e.preventDefault();
+    const now = Date.now();
+    if (now - lastTouchTime < 300) return; // 300ms内不重复触发
+    lastTouchTime = now;
+    const row = parseInt(e.target.dataset.row);
+    const col = parseInt(e.target.dataset.col);
+    handleCellClick(row, col);
+}
