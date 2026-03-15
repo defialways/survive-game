@@ -472,6 +472,173 @@ h1 .version {
     animation: flash 0.5s ease-in-out 2;
 }
 
+/* 🌀 漩涡方块动画 */
+.cell[data-special="vortex"] {
+    background: linear-gradient(135deg, #6a0dad, #9b30ff, #6a0dad, #4b0082);
+    background-size: 300% 300%;
+    animation: vortex-spin 2s ease-in-out infinite;
+    box-shadow: 0 0 12px rgba(106, 13, 173, 0.6);
+}
+
+@keyframes vortex-spin {
+    0% { background-position: 0% 50%; transform: translateZ(0) rotate(0deg); }
+    50% { background-position: 100% 50%; transform: translateZ(8px) rotate(180deg); }
+    100% { background-position: 0% 50%; transform: translateZ(0) rotate(360deg); }
+}
+
+/* 漩涡消除范围动画 */
+.vortex-effect {
+    border-radius: 50%;
+    border: 3px solid rgba(155, 48, 255, 0.8);
+    background: radial-gradient(circle, rgba(106, 13, 173, 0.3) 0%, transparent 70%);
+    animation: vortex-expand 0.8s ease-out forwards;
+}
+
+@keyframes vortex-expand {
+    0% { 
+        transform: translate(-50%, -50%) scale(0.3) rotate(0deg); 
+        opacity: 1; 
+        border-width: 4px;
+    }
+    60% { 
+        transform: translate(-50%, -50%) scale(1.2) rotate(360deg); 
+        opacity: 0.7; 
+    }
+    100% { 
+        transform: translate(-50%, -50%) scale(1.5) rotate(720deg); 
+        opacity: 0; 
+        border-width: 1px;
+    }
+}
+
+/* 漩涡文字弹出 */
+@keyframes vortex-pop {
+    0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+    30% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+}
+
+/* 连锁奖励弹出 */
+@keyframes chain-pop {
+    0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+    20% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
+    70% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    100% { transform: translate(-50%, -60%) scale(0.8); opacity: 0; }
+}
+
+/* 彩虹组合弹出 */
+@keyframes rainbow-combo-pop {
+    0% { transform: translate(-50%, -50%) scale(0.2) rotate(-10deg); opacity: 0; }
+    15% { transform: translate(-50%, -50%) scale(1.4) rotate(5deg); opacity: 1; }
+    40% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+    100% { transform: translate(-50%, -60%) scale(1.2); opacity: 0; }
+}
+
+/* 能量通知 */
+@keyframes energy-notify {
+    0% { transform: translateX(-50%) translateY(-10px); opacity: 0; }
+    15% { transform: translateX(-50%) translateY(0); opacity: 1; }
+    70% { transform: translateX(-50%) translateY(0); opacity: 1; }
+    100% { transform: translateX(-50%) translateY(-20px); opacity: 0; }
+}
+
+/* ============ 能量条 UI ============ */
+.energy-bar-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 12px 0 8px;
+    padding: 8px 16px;
+    background: rgba(0,0,0,0.08);
+    border-radius: 12px;
+}
+
+.energy-bar-container {
+    flex: 1;
+    max-width: 200px;
+    height: 14px;
+    background: rgba(0,0,0,0.15);
+    border-radius: 7px;
+    overflow: hidden;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.energy-bar-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 7px;
+    background: linear-gradient(90deg, #4d96ff, #6bcf7f);
+    transition: width 0.4s ease, background 0.4s ease;
+    box-shadow: 0 0 8px rgba(77, 150, 255, 0.4);
+}
+
+.energy-text {
+    font-size: 12px;
+    font-weight: bold;
+    color: #555;
+    min-width: 40px;
+}
+
+.energy-btn {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: bold;
+    background: linear-gradient(135deg, #ffd93d, #ff9f43);
+    color: #333;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.energy-btn:disabled {
+    background: #ccc;
+    color: #999;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.energy-btn:not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 159, 67, 0.5);
+}
+
+.energy-btn.energy-active {
+    background: linear-gradient(135deg, #ff3333, #cc0000);
+    color: white;
+    animation: energy-active-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes energy-active-pulse {
+    0%, 100% { box-shadow: 0 0 5px rgba(255,0,0,0.5); }
+    50% { box-shadow: 0 0 20px rgba(255,0,0,0.8); }
+}
+
+/* 能量模式棋盘高亮 */
+#game-board.energy-mode {
+    box-shadow: 0 0 20px rgba(255, 217, 61, 0.8), 0 20px 40px rgba(0,0,0,0.3);
+    cursor: crosshair;
+}
+
+#game-board.energy-mode .cell {
+    cursor: crosshair;
+    animation: energy-cell-glow 1s ease-in-out infinite alternate;
+}
+
+@keyframes energy-cell-glow {
+    0% { box-shadow: 3px 3px 6px rgba(0,0,0,0.2), 0 0 0 rgba(255,217,61,0); }
+    100% { box-shadow: 3px 3px 6px rgba(0,0,0,0.2), 0 0 10px rgba(255,217,61,0.5); }
+}
+
+/* 组合提示 */
+.combo-hint {
+    color: #9400d3;
+    font-weight: bold;
+    font-style: italic;
+}
+
 /* 爆米花效果 */
 .confetti {
     position: absolute;  /* 使用absolute相对于container定位 */

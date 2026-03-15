@@ -30,9 +30,19 @@
             </div>
             
             <div class="special-blocks-info">
-                <p>特殊方块: 💣炸弹 | 🌈彩虹 | ↔️横消 | ↕️竖消</p>
+                <p>特殊方块: 💣炸弹 | 🌈彩虹 | ↔️横消 | ↕️竖消 | 🌀漩涡</p>
+                <p class="combo-hint">🌈+特殊方块 = 超级组合技！</p>
             </div>
-            
+
+            <!-- 新增：能量条 -->
+            <div class="energy-bar-wrapper">
+                <div class="energy-bar-container">
+                    <div id="energy-bar" class="energy-bar-fill"></div>
+                </div>
+                <span id="energy-text" class="energy-text">0/100</span>
+                <button id="energy-btn" class="energy-btn" disabled>⚡ 释放技能</button>
+            </div>
+
             <div class="action-buttons">
                 <button id="undo">↩️ 撤销</button>
                 <button id="hint">💡 提示</button>

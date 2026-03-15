@@ -15,23 +15,22 @@ const ENERGY_PER_CLEAR = 3;      // 每消除一个方块充能
 const ENERGY_SPECIAL_COST = 100; // 释放技能消耗
 
 // 游戏状态
-let board = [];  // 游戏棋盘
-let score = 0;   // 分数
-let targetScore = 5000; // 目标分数（以前次最高分为基准，每5000分报喜）
-let selectedCell = null;  // 当前选中的方块
-let soundEnabled = true;  // 音效开关
-let lastMilestone = 0;  // 上次达到的里程碑（每5000分）
-let bgMusicInterval = null;  // 背景音乐定时器
-let moveCount = 0;  // 移动次数
-let comboCount = 0;  // 连击数
-let totalCleared = 0;  // 累计消除方块数
-let undoStack = [];  // 撤销栈
-const MAX_UNDO = 5;  // 最多保存5步
-let triggeredSpecials = new Set();  // 已触发的特殊方块（防止连锁二次触发）
-let lastTouchTime = 0;  // 触摸事件防重复触发时间戳
-let isTouchEvent = false;  // 区分触摸和点击事件（小狐狸建议）
-let isProcessing = false;  // 防止重复处理（替换window.isLevelingUp）
-let level = 1;  // 当前里程碑等级（每5000分升一级）
+let board = [];
+let score = 0;
+let targetScore = 5000;
+let selectedCell = null;
+let soundEnabled = true;
+let lastMilestone = 0;
+let bgMusicInterval = null;
+let moveCount = 0;
+let comboCount = 0;
+let totalCleared = 0;
+let undoStack = [];
+const MAX_UNDO = 5;
+let triggeredSpecials = new Set();
+let lastTouchTime = 0;
+let isTouchEvent = false;
+let isProcessing = false;
 
 // 新增状态
 let energy = 0;                    // 当前能量
@@ -504,7 +503,6 @@ function getCellColor(emoji) {
 
 // ============ 点击与交换 ============
 function handleCellClick(row, col) {
-    if (isProcessing) return;  // 防止动画过程中重复点击
     initAudio();
     playClickSound();
 
@@ -563,7 +561,6 @@ function swapCells(cell1, cell2) {
     renderBoard();
 
     if (hasMatches()) {
-        isProcessing = true;
         saveUndoState();
         moveCount++;
         updateMoveCount();
@@ -601,8 +598,6 @@ function detectRainbowCombo(emoji1, emoji2) {
 
 // ============ 新增：执行彩虹组合效果 ============
 function executeRainbowCombo(cell1, cell2, combo) {
-    isProcessing = true;
-    rainbowComboCount++;  // 追踪彩虹组合次数
     playRainbowComboSound();
     saveUndoState();
     moveCount++;
@@ -731,7 +726,6 @@ function executeRainbowCombo(cell1, cell2, combo) {
             bestChainThisTurn = Math.max(bestChainThisTurn, chainCount);
             setTimeout(() => processMatches(), 300);
         } else {
-            isProcessing = false;
             chainCount = 0;
             bestChainThisTurn = 0;
             comboCount = 0;
@@ -862,7 +856,6 @@ function showEnergyFullNotification() {
 function placeSpecialByEnergy(row, col) {
     if (energy < ENERGY_MAX) return;
     energy -= ENERGY_SPECIAL_COST;
-    energyUsedCount++;  // 追踪能量使用次数
     isEnergyMode = false;
 
     // 随机生成强力特殊方块（比普通刷新概率高的特殊类型）
@@ -903,22 +896,6 @@ function showEnergyPlaceEffect(row, col, emoji) {
     `;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 1100);
-}
-
-// 更新里程碑等级显示
-function updateLevelInfo() {
-    const levelEl = document.getElementById('level');
-    if (levelEl) {
-        levelEl.textContent = level;
-    }
-}
-
-// 更新里程碑等级显示
-function updateLevelInfo() {
-    const levelEl = document.getElementById('level');
-    if (levelEl) {
-        levelEl.textContent = level;
-    }
 }
 
 // ============ 排行榜系统 ============
@@ -1184,7 +1161,6 @@ function processMatches() {
             // 自动连锁 — 不需要额外处理，chainCount 会在下一轮 processMatches 中继续递增
             setTimeout(() => processMatches(), 300);
         } else {
-            isProcessing = false;
             comboCount = 0;
             chainCount = 0;
             bestChainThisTurn = 0;
@@ -1467,8 +1443,6 @@ function updateScore() {
     const currentMilestone = Math.floor(score / 5000);
     if (currentMilestone > lastMilestone) {
         lastMilestone = currentMilestone;
-        level = currentMilestone + 1;  // 更新里程碑等级
-        updateLevelInfo();  // 更新显示
         celebrateMilestone();
         targetScore = (currentMilestone + 1) * 5000;
         updateTargetInfo();
@@ -1545,20 +1519,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('beforeunload', () => {
         if (score > 0) saveToLeaderboard(score);
-    });
-
-    // 移动端：页面隐藏时停止音乐，回到前台时恢复
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-            stopBgMusic();
-        } else if (soundEnabled) {
-            initAudio();
-            startBgMusic();
-        }
-    });
-
-    // 兼容部分浏览器的 pagehide 事件
-    window.addEventListener('pagehide', () => {
-        stopBgMusic();
     });
 });
