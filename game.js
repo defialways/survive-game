@@ -97,7 +97,7 @@ function playMilestoneSound() {
     });
 }
 
-// 播放背景音乐音符
+// 播放背景音乐音符 - 使用更柔和的音色
 function playBgNote(frequency, duration) {
     if (!soundEnabled || !audioContext) return;
     
@@ -108,29 +108,39 @@ function playBgNote(frequency, duration) {
     gainNode.connect(audioContext.destination);
     
     oscillator.frequency.value = frequency;
-    oscillator.type = 'triangle';
+    oscillator.type = 'sine'; // 使用正弦波，更柔和
     
-    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+    // 更低的音量，更轻柔
+    gainNode.gain.setValueAtTime(0.06, audioContext.currentTime);
     gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
     
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + duration);
 }
 
-// 开始背景音乐
+// 开始背景音乐 - 轻柔的循环旋律
 function startBgMusic() {
     if (bgMusicInterval) return;
     
-    // 舒缓的旋律（C大调）
+    // 轻柔的轻音乐旋律（类似摇篮曲的简单循环）
+    // 使用五声音阶，更和谐悦耳
     const melody = [
-        { note: 262, duration: 0.5 },  // C
-        { note: 294, duration: 0.5 },  // D
-        { note: 330, duration: 0.5 },  // E
-        { note: 349, duration: 0.5 },  // F
-        { note: 392, duration: 0.5 },  // G
-        { note: 349, duration: 0.5 },  // F
-        { note: 330, duration: 0.5 },  // E
-        { note: 294, duration: 0.5 }   // D
+        { note: 262, duration: 0.8 },  // C4
+        { note: 294, duration: 0.4 },  // D4
+        { note: 330, duration: 0.8 },  // E4
+        { note: 392, duration: 0.8 },  // G4
+        { note: 330, duration: 0.4 },  // E4
+        { note: 294, duration: 0.8 },  // D4
+        { note: 262, duration: 1.2 },  // C4 (延长)
+        { note: 0, duration: 0.4 },    // 休止
+        { note: 330, duration: 0.8 },  // E4
+        { note: 392, duration: 0.4 },  // G4
+        { note: 440, duration: 0.8 },  // A4
+        { note: 392, duration: 0.4 },  // G4
+        { note: 330, duration: 0.8 },  // E4
+        { note: 294, duration: 0.8 },  // D4
+        { note: 262, duration: 1.6 },  // C4 (延长)
+        { note: 0, duration: 0.8 },    // 休止
     ];
     
     let noteIndex = 0;
@@ -139,11 +149,10 @@ function startBgMusic() {
         if (!soundEnabled) return;
         
         const currentNote = melody[noteIndex];
-        // 根据分数调整音高和速度，但设置上限（小狐狸建议）
-        const speedMultiplier = Math.min(1 + (score / 3000), 1.5); // 最快1.5倍
-        const pitchMultiplier = Math.min(1 + (score / 8000), 1.2); // 最高1.2倍音调
-        
-        playBgNote(currentNote.note * pitchMultiplier, currentNote.duration / speedMultiplier);
+        if (currentNote.note > 0) {
+            // 固定音量，不随分数变化，保持轻柔
+            playBgNote(currentNote.note, currentNote.duration * 0.8);
+        }
         
         noteIndex = (noteIndex + 1) % melody.length;
     };
@@ -151,7 +160,7 @@ function startBgMusic() {
     playNextNote();
     bgMusicInterval = setInterval(() => {
         playNextNote();
-    }, 600); // 基础间隔
+    }, 800); // 较慢的间隔，更舒缓
 }
 
 // 停止背景音乐
@@ -248,7 +257,13 @@ function renderBoard() {
             else if (emoji === SPECIAL_TYPES.VERTICAL) cell.dataset.special = 'vertical';
             
             cell.addEventListener('click', () => handleCellClick(row, col));
-            cell.addEventListener('touchend', handleCellTouch, { passive: false });
+            cell.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                const now = Date.now();
+                if (now - lastTouchTime < 300) return;
+                lastTouchTime = now;
+                handleCellClick(row, col);
+            }, { passive: false });
             gameBoard.appendChild(cell);
         }
     }
@@ -1029,14 +1044,5 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// 触摸事件防重复触发（小狐狸建议）
+// 触摸事件防重复触发时间戳
 let lastTouchTime = 0;
-function handleCellTouch(e) {
-    e.preventDefault();
-    const now = Date.now();
-    if (now - lastTouchTime < 300) return; // 300ms内不重复触发
-    lastTouchTime = now;
-    const row = parseInt(e.target.dataset.row);
-    const col = parseInt(e.target.dataset.col);
-    handleCellClick(row, col);
-}

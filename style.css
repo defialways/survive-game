@@ -12,13 +12,12 @@ body {
     overflow-x: hidden;
 }
 
-/* 3D 游戏包装器 */
+/* 游戏包装器 */
 .game-wrapper {
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    perspective: 1000px;
 }
 
 .container {
@@ -30,13 +29,6 @@ body {
         0 25px 50px -12px rgba(0, 0, 0, 0.4),
         0 0 0 1px rgba(255, 255, 255, 0.1);
     max-width: 95vw;
-    transform-style: preserve-3d;
-    transform: rotateX(2deg);
-    transition: transform 0.3s ease;
-}
-
-.container:hover {
-    transform: rotateX(0deg) translateY(-5px);
 }
 
 h1 {
@@ -93,9 +85,8 @@ h1 .version {
     justify-content: center;
 }
 
-/* 3D 棋盘包装器 */
+/* 棋盘包装器 */
 .board-wrapper {
-    perspective: 800px;
     margin: 0 auto;
     padding: 15px;
     background: linear-gradient(145deg, #e6e6f0 0%, #d0d0e0 100%);
@@ -115,8 +106,6 @@ h1 .version {
     border-radius: 12px;
     margin: 0 auto;
     touch-action: manipulation;
-    transform-style: preserve-3d;
-    transform: rotateX(5deg);
     box-shadow: 
         0 20px 40px rgba(0,0,0,0.3),
         inset 0 0 0 2px rgba(255,255,255,0.1);
@@ -504,7 +493,6 @@ h1 .version {
 @media screen and (max-width: 600px) {
     .container {
         padding: 15px;
-        transform: rotateX(0deg);
     }
     
     .game-info {
@@ -521,7 +509,6 @@ h1 .version {
         grid-template-rows: repeat(8, 40px);
         gap: 3px;
         padding: 8px;
-        transform: rotateX(0deg);
     }
     
     .cell {
