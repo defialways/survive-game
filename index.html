@@ -3,30 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>消消乐游戏</title>
+    <title>消消乐游戏 - 3D版</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>🎮 消消乐</h1>
-        <div class="game-info">
-            <div class="score">分数: <span id="score">0</span></div>
-            <div class="level-info">关卡: <span id="level">1</span> | 目标: <span id="target-score">500</span> | 步数: <span id="move-count">0</span></div>
-        </div>
-        
-        <div id="game-board"></div>
-        
-        <div class="special-blocks-info">
-            <p>特殊方块: 💣炸弹 | 🌈彩虹 | ↔️横消 | ↕️竖消</p>
-        </div>
-        
-        <div class="action-buttons">
-            <button id="undo">↩️ 撤销 (0)</button>
-            <button id="hint">💡 提示</button>
-            <button id="restart">🔄 重新开始</button>
-            <button id="sound-toggle">🔊 音效</button>
-            <button id="leaderboard-btn">🏆 排行榜</button>
-            <button id="achievements-btn">🎖️ 成就</button>
+    <div class="game-wrapper">
+        <div class="container">
+            <h1>🎮 消消乐 <span class="version">3D</span></h1>
+            <div class="game-info">
+                <div class="score-display">
+                    <span class="score-label">分数</span>
+                    <span id="score" class="score-value">0</span>
+                </div>
+                <div class="target-display">
+                    <span class="target-label">目标</span>
+                    <span id="target-score" class="target-value">5000</span>
+                </div>
+                <div class="moves-display">
+                    <span class="moves-label">步数</span>
+                    <span id="move-count" class="moves-value">0</span>
+                </div>
+            </div>
+            
+            <div class="board-wrapper">
+                <div id="game-board"></div>
+            </div>
+            
+            <div class="special-blocks-info">
+                <p>特殊方块: 💣炸弹 | 🌈彩虹 | ↔️横消 | ↕️竖消</p>
+            </div>
+            
+            <div class="action-buttons">
+                <button id="undo">↩️ 撤销</button>
+                <button id="hint">💡 提示</button>
+                <button id="restart">🔄 重新开始</button>
+                <button id="sound-toggle">🔊 音效</button>
+                <button id="leaderboard-btn">🏆 排行榜</button>
+                <button id="achievements-btn">🎖️ 成就</button>
+            </div>
         </div>
     </div>
     

@@ -11,17 +11,16 @@ const SPECIAL_TYPES = {
 // 游戏状态
 let board = [];  // 游戏棋盘
 let score = 0;   // 分数
-let level = 1;   // 当前关卡
-let targetScore = 500; // 当前关卡目标分数
+let targetScore = 5000; // 目标分数（以前次最高分为基准，每5000分报喜）
 let selectedCell = null;  // 当前选中的方块
 let soundEnabled = true;  // 音效开关
-let lastMilestone = 0;  // 上次达到的里程碑
+let lastMilestone = 0;  // 上次达到的里程碑（每5000分）
 let bgMusicInterval = null;  // 背景音乐定时器
 let moveCount = 0;  // 移动次数
 let comboCount = 0;  // 连击数
 let totalCleared = 0;  // 累计消除方块数
 let undoStack = [];  // 撤销栈
-const MAX_UNDO = 5;  // 最多保存5步（小狐狸建议增加）
+const MAX_UNDO = 5;  // 最多保存5步
 let triggeredSpecials = new Set();  // 已触发的特殊方块（防止连锁二次触发）
 
 // 音频上下文
@@ -166,15 +165,22 @@ function stopBgMusic() {
 // 初始化游戏
 function initGame() {
     score = 0;
-    level = 1;
-    targetScore = 500;
     moveCount = 0;
     comboCount = 0;
     totalCleared = 0;
     undoStack = [];
+    triggeredSpecials.clear();
     window.isLevelingUp = false;
+    
+    // 从排行榜获取上次最高分，作为初始目标
+    const leaderboard = getLeaderboard();
+    const lastHighScore = leaderboard.length > 0 ? leaderboard[0].score : 0;
+    // 目标为上次最高分向上取整到5000的倍数，最低5000
+    targetScore = Math.max(5000, Math.ceil((lastHighScore + 1) / 5000) * 5000);
+    lastMilestone = Math.floor(targetScore / 5000) - 1;
+    
     updateScore();
-    updateLevelInfo();
+    updateTargetInfo();
     updateMoveCount();
     board = createBoard();
     renderBoard();
@@ -189,8 +195,8 @@ function initGame() {
 // 创建游戏棋盘
 function createBoard() {
     const newBoard = [];
-    // 特殊方块概率随关卡持续降低（小狐狸建议）
-    const specialChance = Math.max(0.02, 0.1 - (level * 0.015));
+    // 特殊方块概率固定5%
+    const specialChance = 0.05;
     
     for (let row = 0; row < GRID_SIZE; row++) {
         newBoard[row] = [];
@@ -453,11 +459,11 @@ function getLeaderboard() {
 }
 
 // 保存到排行榜
-function saveToLeaderboard(score, level) {
+function saveToLeaderboard(score, milestone) {
     const leaderboard = getLeaderboard();
     leaderboard.push({
         score,
-        level,
+        milestone: milestone || Math.floor(score / 5000) + 1,
         date: new Date().toLocaleDateString('zh-CN'),
         totalCleared
     });
@@ -479,7 +485,7 @@ function showLeaderboard() {
             <li class="${i < 3 ? 'top-' + (i + 1) : ''}">
                 <span class="rank">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1)}</span>
                 <span class="score">${item.score}分</span>
-                <span class="level">关卡${item.level}</span>
+                <span class="milestone">第${item.milestone || Math.floor(item.score / 5000) + 1}个里程碑</span>
                 <span class="date">${item.date}</span>
             </li>
         `).join('');
@@ -489,14 +495,16 @@ function showLeaderboard() {
 
 // ============ 成就系统 ============
 const ACHIEVEMENTS = [
-    { id: 'level5', name: '初露锋芒', desc: '达到第5关', check: (s) => s.level >= 5 },
-    { id: 'level10', name: '消消乐达人', desc: '达到第10关', check: (s) => s.level >= 10 },
     { id: 'score1000', name: '千分俱乐部', desc: '单局达到1000分', check: (s) => s.score >= 1000 },
     { id: 'score5000', name: '五千元户', desc: '单局达到5000分', check: (s) => s.score >= 5000 },
+    { id: 'score10000', name: '万分达人', desc: '单局达到10000分', check: (s) => s.score >= 10000 },
+    { id: 'score50000', name: '消除传奇', desc: '单局达到50000分', check: (s) => s.score >= 50000 },
     { id: 'clear100', name: '清理大师', desc: '累计消除100个方块', check: (s) => s.totalCleared >= 100 },
     { id: 'clear500', name: '消除狂人', desc: '累计消除500个方块', check: (s) => s.totalCleared >= 500 },
+    { id: 'clear1000', name: '消除之神', desc: '累计消除1000个方块', check: (s) => s.totalCleared >= 1000 },
     { id: 'combo3', name: '连击新星', desc: '达成3连击', check: (s) => s.comboCount >= 3 },
-    { id: 'combo5', name: '连击之王', desc: '达成5连击', check: (s) => s.comboCount >= 5 }
+    { id: 'combo5', name: '连击之王', desc: '达成5连击', check: (s) => s.comboCount >= 5 },
+    { id: 'combo10', name: '连击之神', desc: '达成10连击', check: (s) => s.comboCount >= 10 }
 ];
 
 // 获取已解锁成就
@@ -512,7 +520,7 @@ function getAchievements() {
 // 检查成就
 function checkAchievements() {
     const unlocked = getAchievements();
-    const state = { score, level, totalCleared, comboCount };
+    const state = { score, totalCleared, comboCount };
     
     ACHIEVEMENTS.forEach(achievement => {
         if (!unlocked.includes(achievement.id) && achievement.check(state)) {
@@ -564,7 +572,9 @@ function showAchievements() {
 
 // 游戏结束时保存记录
 function gameOver() {
-    saveToLeaderboard(score, level);
+    if (score > 0) {
+        saveToLeaderboard(score);
+    }
 }
 
 // 检查是否有匹配
@@ -759,6 +769,32 @@ function showComboText(combo) {
     setTimeout(() => comboEl.remove(), 800);
 }
 
+// 显示里程碑祝贺文字
+function showMilestoneText(milestone) {
+    const msg = document.createElement('div');
+    msg.className = 'milestone-text';
+    msg.innerHTML = `🎉 恭喜达到 <strong>${milestone}</strong> 分！`;
+    msg.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) scale(0);
+        font-size: 28px;
+        font-weight: bold;
+        color: #ffd700;
+        text-shadow: 2px 2px 8px rgba(0,0,0,0.5);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px 40px;
+        border-radius: 16px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+        animation: milestone-pop 2s ease-out forwards;
+        pointer-events: none;
+        z-index: 1000;
+    `;
+    document.body.appendChild(msg);
+    setTimeout(() => msg.remove(), 2500);
+}
+
 // ============ 死局检测和洗牌（小狐狸建议）============
 // 检查是否有有效移动
 function hasValidMoves() {
@@ -872,62 +908,40 @@ function fillEmpty() {
 function updateScore() {
     document.getElementById('score').textContent = score;
     
-    // 检查是否达到新的里程碑（每1000分）
-    const currentMilestone = Math.floor(score / 1000);
+    // 每5000分庆祝一次（小狐狸建议）
+    const currentMilestone = Math.floor(score / 5000);
     if (currentMilestone > lastMilestone) {
         lastMilestone = currentMilestone;
         celebrateMilestone();
-    }
-    
-    // 检查是否达到关卡目标（使用临时变量防止重复升级）
-    if (score >= targetScore && !window.isLevelingUp) {
-        window.isLevelingUp = true;
-        setTimeout(() => {
-            levelUp();
-            window.isLevelingUp = false;
-        }, 500);
+        
+        // 更新目标到下一个5000分
+        targetScore = (currentMilestone + 1) * 5000;
+        updateTargetInfo();
+        
+        // 保存记录
+        saveToLeaderboard(score, Math.floor(score / 5000) + 1);
     }
 }
 
-// 更新关卡信息显示
-function updateLevelInfo() {
-    document.getElementById('level').textContent = level;
+// 更新目标分数显示
+function updateTargetInfo() {
     document.getElementById('target-score').textContent = targetScore;
 }
 
 // 升级处理
-function levelUp() {
-    level++;
-    // 目标分数：基础500 + 每关增加，上限5000
-    const baseScore = 500;
-    const increment = level * 300;
-    targetScore = Math.min(baseScore + increment, 5000);
-    updateLevelInfo();
-    
-    // 每5关给予奖励（生成额外特殊方块）
-    if (level % 5 === 0) {
-        // 奖励关卡：增加一个彩虹方块到随机位置
-        const rewardRow = Math.floor(Math.random() * GRID_SIZE);
-        const rewardCol = Math.floor(Math.random() * GRID_SIZE);
-        board[rewardRow][rewardCol] = SPECIAL_TYPES.RAINBOW;
-        renderBoard();
-    }
-    
-    // 页面闪烁庆祝升级
-    document.body.classList.add('flash');
-    setTimeout(() => {
-        document.body.classList.remove('flash');
-    }, 1000);
-    
-    // 播放升级音效
-    playMilestoneSound();
-    
-    // 创建更多爆米花效果
-    createConfetti();
+// 每达到一个5000分里程碑，奖励一个彩虹方块
+function awardRainbowForMilestone() {
+    const rewardRow = Math.floor(Math.random() * GRID_SIZE);
+    const rewardCol = Math.floor(Math.random() * GRID_SIZE);
+    board[rewardRow][rewardCol] = SPECIAL_TYPES.RAINBOW;
+    renderBoard();
 }
 
-// 庆祝里程碑
+// 庆祝里程碑（每5000分）
 function celebrateMilestone() {
+    // 奖励彩虹方块
+    awardRainbowForMilestone();
+    
     // 页面闪烁
     document.body.classList.add('flash');
     setTimeout(() => {
@@ -939,6 +953,9 @@ function celebrateMilestone() {
     
     // 爆米花效果
     createConfetti();
+    
+    // 显示祝贺文字
+    showMilestoneText(lastMilestone * 5000);
 }
 
 // 创建爆米花效果
