@@ -11,8 +11,6 @@ const SPECIAL_TYPES = {
 // 游戏状态
 let board = [];  // 游戏棋盘
 let score = 0;   // 分数
-let level = 1;   // 当前关卡
-let targetScore = 500; // 当前关卡目标分数
 let selectedCell = null;  // 当前选中的方块
 let soundEnabled = true;  // 音效开关
 let lastMilestone = 0;  // 上次达到的里程碑
@@ -160,11 +158,7 @@ function stopBgMusic() {
 // 初始化游戏
 function initGame() {
     score = 0;
-    level = 1;
-    targetScore = 500;
-    window.isLevelingUp = false;
     updateScore();
-    updateLevelInfo();
     board = createBoard();
     renderBoard();
     
@@ -181,14 +175,7 @@ function createBoard() {
     for (let row = 0; row < GRID_SIZE; row++) {
         newBoard[row] = [];
         for (let col = 0; col < GRID_SIZE; col++) {
-            // 10% chance to create a special block
-            if (Math.random() < 0.1) {
-                const specialKeys = Object.keys(SPECIAL_TYPES);
-                const randomSpecial = specialKeys[Math.floor(Math.random() * specialKeys.length)];
-                newBoard[row][col] = SPECIAL_TYPES[randomSpecial];
-            } else {
-                newBoard[row][col] = getRandomColor();
-            }
+            newBoard[row][col] = getRandomColor();
         }
     }
     return newBoard;
@@ -213,10 +200,6 @@ function renderBoard() {
             cell.dataset.col = col;
             cell.style.backgroundColor = getCellColor(board[row][col]);
             cell.addEventListener('click', () => handleCellClick(row, col));
-            cell.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                handleCellClick(row, col);
-            }, { passive: false });
             gameBoard.appendChild(cell);
         }
     }
@@ -230,11 +213,7 @@ function getCellColor(emoji) {
         '🟢': '#6bcf7f',
         '🔵': '#4d96ff',
         '🟣': '#b565d8',
-        '🟠': '#ff9f43',
-        '💣': '#8b0000',      // 炸弹 - 深红色
-        '🌈': '#9400d3',      // 彩虹 - 紫色
-        '↔️': '#00bfff',      // 水平消除 - 深天蓝
-        '↕️': '#00ced1'       // 垂直消除 - 暗青色
+        '🟠': '#ff9f43'
     };
     return colorMap[emoji] || '#ccc';
 }
@@ -323,12 +302,12 @@ function isPartOfMatch(row, col) {
     // 检查横向匹配
     let horizontalCount = 1;
     let left = col - 1;
-    while (left >= 0 && (board[row][left] === color || isRainbow(board[row][left]) || isRainbow(color))) {
+    while (left >= 0 && board[row][left] === color) {
         horizontalCount++;
         left--;
     }
     let right = col + 1;
-    while (right < GRID_SIZE && (board[row][right] === color || isRainbow(board[row][right]) || isRainbow(color))) {
+    while (right < GRID_SIZE && board[row][right] === color) {
         horizontalCount++;
         right++;
     }
@@ -336,22 +315,17 @@ function isPartOfMatch(row, col) {
     // 检查纵向匹配
     let verticalCount = 1;
     let up = row - 1;
-    while (up >= 0 && (board[up][col] === color || isRainbow(board[up][col]) || isRainbow(color))) {
+    while (up >= 0 && board[up][col] === color) {
         verticalCount++;
         up--;
     }
     let down = row + 1;
-    while (down < GRID_SIZE && (board[down][col] === color || isRainbow(board[down][col]) || isRainbow(color))) {
+    while (down < GRID_SIZE && board[down][col] === color) {
         verticalCount++;
         down++;
     }
     
     return horizontalCount >= 3 || verticalCount >= 3;
-}
-
-// 检查是否是彩虹方块（万能方块）
-function isRainbow(emoji) {
-    return emoji === SPECIAL_TYPES.RAINBOW;
 }
 
 // 处理匹配：消除并计分
@@ -366,46 +340,6 @@ function processMatches() {
             }
         }
     }
-    
-    // 处理特殊方块效果
-    const specialEffects = [];
-    matchedCells.forEach(cell => {
-        const emoji = board[cell.row][cell.col];
-        if (emoji === SPECIAL_TYPES.BOMB) {
-            // 炸弹：消除周围8个方块
-            for (let dr = -1; dr <= 1; dr++) {
-                for (let dc = -1; dc <= 1; dc++) {
-                    const r = cell.row + dr;
-                    const c = cell.col + dc;
-                    if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE && !(dr === 0 && dc === 0)) {
-                        specialEffects.push({ row: r, col: c });
-                    }
-                }
-            }
-        } else if (emoji === SPECIAL_TYPES.HORIZONTAL) {
-            // 水平消除：消除整行
-            for (let c = 0; c < GRID_SIZE; c++) {
-                if (c !== cell.col) {
-                    specialEffects.push({ row: cell.row, col: c });
-                }
-            }
-        } else if (emoji === SPECIAL_TYPES.VERTICAL) {
-            // 垂直消除：消除整列
-            for (let r = 0; r < GRID_SIZE; r++) {
-                if (r !== cell.row) {
-                    specialEffects.push({ row: r, col: cell.col });
-                }
-            }
-        }
-    });
-    
-    // 合并特殊效果到匹配的方块中
-    specialEffects.forEach(effect => {
-        const alreadyMatched = matchedCells.some(cell => cell.row === effect.row && cell.col === effect.col);
-        if (!alreadyMatched) {
-            matchedCells.push(effect);
-        }
-    });
     
     // 播放消除音效
     playMatchSound();
@@ -471,43 +405,6 @@ function updateScore() {
         lastMilestone = currentMilestone;
         celebrateMilestone();
     }
-    
-    // 检查是否达到关卡目标（使用临时变量防止重复升级）
-    if (score >= targetScore && !window.isLevelingUp) {
-        window.isLevelingUp = true;
-        setTimeout(() => {
-            levelUp();
-            window.isLevelingUp = false;
-        }, 500);
-    }
-}
-
-// 更新关卡信息显示
-function updateLevelInfo() {
-    document.getElementById('level').textContent = level;
-    document.getElementById('target-score').textContent = targetScore;
-}
-
-// 升级处理
-function levelUp() {
-    level++;
-    targetScore = level * 500; // 每关增加500分目标
-    updateLevelInfo();
-    
-    // 页面闪烁庆祝升级
-    document.body.classList.add('flash');
-    setTimeout(() => {
-        document.body.classList.remove('flash');
-    }, 1000);
-    
-    // 播放升级音效
-    playMilestoneSound();
-    
-    // 创建更多爆米花效果
-    createConfetti();
-    
-    // 增加特殊方块生成概率（最高不超过30%）
-    // 这里可以添加难度增加的逻辑，比如减少移动次数限制等
 }
 
 // 庆祝里程碑

@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>消消乐游戏</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -11,12 +11,16 @@
         <h1>🎮 消消乐</h1>
         <div class="game-info">
             <div class="score">分数: <span id="score">0</span></div>
-            <div>
+            <div class="level-info">关卡: <span id="level">1</span> / 目标: <span id="target-score">500</span></div>
+            <div class="button-group">
                 <button id="restart">重新开始</button>
                 <button id="sound-toggle">🔊 音效</button>
             </div>
         </div>
         <div id="game-board"></div>
+        <div class="special-blocks-info">
+            <p>特殊方块: 💣炸弹 | 🌈彩虹 | ↔️横消 | ↕️竖消</p>
+        </div>
     </div>
     <script src="game.js"></script>
 </body>
