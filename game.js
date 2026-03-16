@@ -31,7 +31,6 @@ let triggeredSpecials = new Set();  // 已触发的特殊方块（防止连锁�
 let lastTouchTime = 0;  // 触摸事件防重复触发时间戳
 let isTouchEvent = false;  // 区分触摸和点击事件（小狐狸建议）
 let isProcessing = false;  // 防止重复处理（替换window.isLevelingUp）
-let level = 1;  // 当前里程碑等级（每5000分升一级）
 
 // 新增状态
 let energy = 0;                    // 当前能量
@@ -484,6 +483,16 @@ function renderBoard() {
             gameBoard.appendChild(cell);
         }
     }
+    // 新增：弹跳动画 — 标记需要弹跳的格子
+    if (springCells.size > 0) {
+        springCells.forEach(key => {
+            const [r, c] = key.split(',').map(Number);
+            const idx = r * GRID_SIZE + c;
+            const el = gameBoard.children[idx];
+            if (el) el.classList.add('spring-in');
+        });
+        springCells.clear();
+    }
     // 能量模式高亮
     if (isEnergyMode) {
         gameBoard.classList.add('energy-mode');
@@ -570,6 +579,7 @@ function swapCells(cell1, cell2) {
         comboCount = 0;
         chainCount = 0;         // 重置连锁计数
         bestChainThisTurn = 0;  // 重置最高连锁
+        clearComboEffects();    // 新增：新操作开始，清除上轮特效
         setTimeout(() => processMatches(), 300);
     } else {
         setTimeout(() => {
@@ -905,22 +915,6 @@ function showEnergyPlaceEffect(row, col, emoji) {
     setTimeout(() => el.remove(), 1100);
 }
 
-// 更新里程碑等级显示
-function updateLevelInfo() {
-    const levelEl = document.getElementById('level');
-    if (levelEl) {
-        levelEl.textContent = level;
-    }
-}
-
-// 更新里程碑等级显示
-function updateLevelInfo() {
-    const levelEl = document.getElementById('level');
-    if (levelEl) {
-        levelEl.textContent = level;
-    }
-}
-
 // ============ 排行榜系统 ============
 const LEADERBOARD_KEY = 'survive_leaderboard';
 const ACHIEVEMENTS_KEY = 'survive_achievements';
@@ -1173,6 +1167,9 @@ function processMatches() {
     if (comboCount > 1) showComboText(comboCount);
     if (vortexCells.length > 0) showVortexText(vortexCells.length);
 
+    // 新增：连击边框特效
+    updateComboEffects(comboCount);
+
     renderBoard();
 
     setTimeout(() => {
@@ -1189,6 +1186,7 @@ function processMatches() {
             chainCount = 0;
             bestChainThisTurn = 0;
             triggeredSpecials.clear();
+            clearComboEffects();  // 新增：清除连击特效
             checkAchievements();
 
             if (!hasValidMoves()) {
@@ -1223,11 +1221,91 @@ function triggerChainEffect(row, col, emoji, effects) {
 }
 
 // ============ 动画显示 ============
+// ============ 新增：粒子系统 ============
+const PARTICLE_COLORS = {
+    '🔴': ['#ff6b6b', '#ff3333', '#ff8888', '#cc0000'],
+    '🟡': ['#ffd93d', '#ffea00', '#ffcc00', '#ffaa00'],
+    '🟢': ['#6bcf7f', '#00e676', '#4caf50', '#2e7d32'],
+    '🔵': ['#4d96ff', '#2979ff', '#00b0ff', '#0091ea'],
+    '🟣': ['#b565d8', '#9c27b0', '#e040fb', '#7b1fa2'],
+    '🟠': ['#ff9f43', '#ff6d00', '#ffa726', '#e65100'],
+    '💣': ['#ff0000', '#8b0000', '#ff4444', '#cc0000'],
+    '🌈': ['#ff6b6b', '#ffd93d', '#6bcf7f', '#4d96ff', '#b565d8'],
+    '↔️': ['#00bfff', '#00e5ff', '#0091ea', '#00b0ff'],
+    '↕️': ['#00ced1', '#00bfa5', '#00897b', '#26a69a'],
+    '🌀': ['#9b30ff', '#6a0dad', '#bf5fff', '#e040fb'],
+};
+
+const PARTICLE_DEFAULT = ['#ffffff', '#ffd700', '#ff6b6b', '#4d96ff', '#b565d8'];
+
+function getParticleColors(emoji) {
+    return PARTICLE_COLORS[emoji] || PARTICLE_DEFAULT;
+}
+
+function spawnParticles(row, col, emoji, count = 10) {
+    const boardEl = document.getElementById('game-board');
+    const cell = boardEl.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+    if (!cell) return;
+
+    const rect = cell.getBoundingClientRect();
+    const boardRect = boardEl.getBoundingClientRect();
+    const cx = rect.left - boardRect.left + rect.width / 2;
+    const cy = rect.top - boardRect.top + rect.height / 2;
+    const colors = getParticleColors(emoji);
+
+    boardEl.style.position = 'relative';
+    boardEl.style.overflow = 'hidden';
+
+    for (let i = 0; i < count; i++) {
+        const p = document.createElement('div');
+        const angle = (Math.PI * 2 * i / count) + (Math.random() - 0.5) * 0.5;
+        const distance = 30 + Math.random() * 50;
+        const size = 4 + Math.random() * 5;
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        const duration = 300 + Math.random() * 200;
+
+        p.style.cssText = `
+            position: absolute;
+            left: ${cx}px;
+            top: ${cy}px;
+            width: ${size}px;
+            height: ${size}px;
+            border-radius: ${Math.random() > 0.5 ? '50%' : '2px'};
+            background: ${color};
+            box-shadow: 0 0 ${size}px ${color};
+            pointer-events: none;
+            z-index: 50;
+            transition: all ${duration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            opacity: 1;
+        `;
+        boardEl.appendChild(p);
+
+        // 触发动画
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                p.style.left = (cx + Math.cos(angle) * distance) + 'px';
+                p.style.top = (cy + Math.sin(angle) * distance) + 'px';
+                p.style.opacity = '0';
+                p.style.transform = `scale(0.2) rotate(${Math.random() * 360}deg)`;
+            });
+        });
+
+        setTimeout(() => p.remove(), duration + 50);
+    }
+}
+
+// ============ 消除动画（加入粒子） ============
 function showClearAnimation(cells) {
     const allCells = document.querySelectorAll('.cell');
     cells.forEach(({ row, col }) => {
         const index = row * GRID_SIZE + col;
-        if (allCells[index]) allCells[index].classList.add('clearing');
+        if (allCells[index]) {
+            const emoji = board[row][col];
+            // 保留原清除动画
+            allCells[index].classList.add('clearing');
+            // 同时生成粒子
+            spawnParticles(row, col, emoji, 8);
+        }
     });
 }
 
@@ -1300,6 +1378,47 @@ function showRainbowComboText(text) {
     `;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 1600);
+}
+
+// ============ 新增：连击边框特效 ============
+const COMBO_EFFECT_LEVELS = [
+    { min: 2, cls: 'combo-glow-1' },   // 温和的橙色光晕
+    { min: 3, cls: 'combo-fire-1' },   // 火焰
+    { min: 4, cls: 'combo-fire-2' },   // 猛烈火焰
+    { min: 5, cls: 'combo-lightning' }, // 闪电
+];
+
+let comboEffectTimer = null;
+
+function updateComboEffects(combo) {
+    const boardWrapper = document.querySelector('.board-wrapper');
+    if (!boardWrapper) return;
+
+    // 清除旧效果
+    COMBO_EFFECT_LEVELS.forEach(e => boardWrapper.classList.remove(e.cls));
+
+    // 确定当前等级
+    let activeEffect = null;
+    for (let i = COMBO_EFFECT_LEVELS.length - 1; i >= 0; i--) {
+        if (combo >= COMBO_EFFECT_LEVELS[i].min) {
+            activeEffect = COMBO_EFFECT_LEVELS[i];
+            break;
+        }
+    }
+
+    if (activeEffect) {
+        boardWrapper.classList.add(activeEffect.cls);
+    }
+}
+
+function clearComboEffects() {
+    const boardWrapper = document.querySelector('.board-wrapper');
+    if (!boardWrapper) return;
+    // 延迟清除，让效果有个渐退的感觉
+    if (comboEffectTimer) clearTimeout(comboEffectTimer);
+    comboEffectTimer = setTimeout(() => {
+        COMBO_EFFECT_LEVELS.forEach(e => boardWrapper.classList.remove(e.cls));
+    }, 800);
 }
 
 function showMilestoneText(milestone) {
@@ -1443,12 +1562,20 @@ function showShuffleMessage() {
 }
 
 // ============ 下落与填充 ============
+// 新增：记录需要弹跳动画的格子
+let springCells = new Set();
+
 function dropCells() {
     for (let col = 0; col < GRID_SIZE; col++) {
         let emptyRow = GRID_SIZE - 1;
         for (let row = GRID_SIZE - 1; row >= 0; row--) {
             if (board[row][col] !== null) {
-                if (row !== emptyRow) { board[emptyRow][col] = board[row][col]; board[row][col] = null; }
+                if (row !== emptyRow) {
+                    board[emptyRow][col] = board[row][col];
+                    board[row][col] = null;
+                    // 标记移动到新位置的格子（弹跳动画）
+                    springCells.add(`${emptyRow},${col}`);
+                }
                 emptyRow--;
             }
         }
@@ -1458,7 +1585,11 @@ function dropCells() {
 function fillEmpty() {
     for (let row = 0; row < GRID_SIZE; row++)
         for (let col = 0; col < GRID_SIZE; col++)
-            if (board[row][col] === null) board[row][col] = getRandomColor();
+            if (board[row][col] === null) {
+                board[row][col] = getRandomColor();
+                // 新填充的格子也要弹跳
+                springCells.add(`${row},${col}`);
+            }
 }
 
 // ============ 分数与里程碑 ============
@@ -1467,8 +1598,6 @@ function updateScore() {
     const currentMilestone = Math.floor(score / 5000);
     if (currentMilestone > lastMilestone) {
         lastMilestone = currentMilestone;
-        level = currentMilestone + 1;  // 更新里程碑等级
-        updateLevelInfo();  // 更新显示
         celebrateMilestone();
         targetScore = (currentMilestone + 1) * 5000;
         updateTargetInfo();
